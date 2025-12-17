@@ -242,7 +242,7 @@ const LandingPage = () => {
       {/* Bottom Bar */}
       <footer className="w-full px-6 md:px-12 py-3 flex items-center justify-center border-t-2" style={{ borderColor: '#91C6BC' }}>
         <p className="text-md" style={{ color: '#5C4033', fontFamily: 'Georgia, serif' }}>
-          Build with <span style={{ color: '#E37434' }}>❤️</span> of Manasi
+          Build with <span style={{ color: '#E37434' }}>❤️</span> for Manasi
         </p>
       </footer>
     </div>
