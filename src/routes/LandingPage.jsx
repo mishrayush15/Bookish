@@ -93,7 +93,7 @@ const LandingPage = () => {
               className="text-sm md:text-base lg:text-lg italic max-w-sm leading-relaxed -mt-6"
               style={{ color: '#5C4033', fontFamily: 'Georgia, serif' }}
             >
-              bookish helped me finish my first novel. The page-by-page approach 
+              bookish is helping me finish my first novel. The page-by-page approach 
               kept me focused and motivated every single day.
             </p>
             <p 
