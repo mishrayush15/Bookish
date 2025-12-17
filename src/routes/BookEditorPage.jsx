@@ -66,11 +66,20 @@ const BookEditorPage = () => {
   // PDF download state
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
+  // Auto-page creation state
+  const [isAutoCreatingPage, setIsAutoCreatingPage] = useState(false)
+
   // Auto-save refs
   const autoSaveRef = useRef(null)
   const editorContentRef = useRef(editorContent)
   const currentPageRef = useRef(null)
   const hasUnsavedChangesRef = useRef(false)
+  const quillEditorRef = useRef(null)
+  const isAutoCreatingRef = useRef(false)
+
+  // A4 page height in pixels (accounting for margins and header)
+  // A4 is 297mm, with ~40mm margins = ~257mm content area = ~970px at 96 DPI
+  const A4_CONTENT_HEIGHT = 850
 
   // Keep refs in sync
   useEffect(() => {
@@ -84,6 +93,31 @@ const BookEditorPage = () => {
   useEffect(() => {
     hasUnsavedChangesRef.current = hasUnsavedChanges
   }, [hasUnsavedChanges])
+
+  // Monitor editor height and show visual indicator when nearly full
+  useEffect(() => {
+    const checkPageFill = () => {
+      const editorElement = document.querySelector('.quill-vintage .ql-editor')
+      const container = document.querySelector('.quill-a4')
+      if (!editorElement || !container) return
+
+      const contentHeight = editorElement.scrollHeight
+      const fillPercentage = (contentHeight / A4_CONTENT_HEIGHT) * 100
+
+      if (fillPercentage >= 80) {
+        container.classList.add('page-nearly-full')
+      } else {
+        container.classList.remove('page-nearly-full')
+      }
+    }
+
+    // Check on content change
+    checkPageFill()
+    
+    // Also check periodically
+    const interval = setInterval(checkPageFill, 500)
+    return () => clearInterval(interval)
+  }, [editorContent])
 
 
   // Fetch book and pages
@@ -227,6 +261,81 @@ const BookEditorPage = () => {
     }
   }, [])
 
+  // Check if editor content exceeds A4 page height
+  const checkAndAutoCreatePage = useCallback(async () => {
+    if (isAutoCreatingRef.current) return
+    
+    // Find the Quill editor element
+    const editorElement = document.querySelector('.quill-vintage .ql-editor')
+    if (!editorElement) return
+
+    const contentHeight = editorElement.scrollHeight
+    const visibleHeight = editorElement.clientHeight
+
+    // If content exceeds the A4 height, create new page
+    if (contentHeight > A4_CONTENT_HEIGHT && contentHeight > visibleHeight + 50) {
+      isAutoCreatingRef.current = true
+      setIsAutoCreatingPage(true)
+
+      try {
+        // First, save the current page
+        if (currentPageRef.current && editorContentRef.current) {
+          await supabase
+            .from('book_pages')
+            .update({
+              content: editorContentRef.current,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', currentPageRef.current.id)
+        }
+
+        // Create new page
+        const newPageNumber = pages.length + 1
+        const { data: newPage, error: newPageError } = await supabase
+          .from('book_pages')
+          .insert({
+            book_id: bookId,
+            page_number: newPageNumber,
+            content: '',
+          })
+          .select()
+          .single()
+
+        if (newPageError) {
+          console.error('Error auto-creating page:', newPageError)
+          return
+        }
+
+        // Update last_page in the book
+        await supabase
+          .from('books')
+          .update({ last_page: newPageNumber })
+          .eq('id', bookId)
+
+        // Update local state
+        setPages((prev) => [...prev, newPage])
+        
+        // Update current page content in local state
+        setPages((prev) =>
+          prev.map((p) =>
+            p.id === currentPageRef.current?.id
+              ? { ...p, content: editorContentRef.current }
+              : p
+          )
+        )
+
+        // Navigate to new page
+        setCurrentPageIndex(pages.length)
+        setEditorContent('')
+        setHasUnsavedChanges(false)
+
+      } finally {
+        isAutoCreatingRef.current = false
+        setIsAutoCreatingPage(false)
+      }
+    }
+  }, [bookId, pages.length])
+
   // Handle editor change
   const handleEditorChange = useCallback(
     (content) => {
@@ -236,11 +345,16 @@ const BookEditorPage = () => {
         setHasUnsavedChanges(true)
         // Trigger debounced auto-save
         triggerDebouncedSave()
+        
+        // Check if we need to auto-create a new page (debounced)
+        setTimeout(() => {
+          checkAndAutoCreatePage()
+        }, 100)
       } else {
         setHasUnsavedChanges(false)
       }
     },
-    [currentPage, triggerDebouncedSave]
+    [currentPage, triggerDebouncedSave, checkAndAutoCreatePage]
   )
 
   // Navigate to a specific page
@@ -299,6 +413,64 @@ const BookEditorPage = () => {
     setCurrentPageIndex(pages.length) // Go to new page
     setEditorContent('')
     setHasUnsavedChanges(false)
+  }
+
+  // Delete current page
+  const handleDeletePage = async () => {
+    // Can't delete if it's the only page
+    if (pages.length <= 1) {
+      alert('Cannot delete the only page. A book must have at least one page.')
+      return
+    }
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete Page ${currentPage?.page_number}? This cannot be undone.`
+    )
+    if (!confirmDelete) return
+
+    const pageToDelete = currentPage
+    if (!pageToDelete) return
+
+    // Delete the page from database
+    const { error: deleteError } = await supabase
+      .from('book_pages')
+      .delete()
+      .eq('id', pageToDelete.id)
+
+    if (deleteError) {
+      console.error('Error deleting page:', deleteError)
+      alert('Failed to delete page. Please try again.')
+      return
+    }
+
+    // Update local pages state and renumber remaining pages
+    const remainingPages = pages.filter(p => p.id !== pageToDelete.id)
+    
+    // Renumber pages in database
+    for (let i = 0; i < remainingPages.length; i++) {
+      const page = remainingPages[i]
+      if (page.page_number !== i + 1) {
+        await supabase
+          .from('book_pages')
+          .update({ page_number: i + 1 })
+          .eq('id', page.id)
+        remainingPages[i] = { ...page, page_number: i + 1 }
+      }
+    }
+
+    setPages(remainingPages)
+
+    // Navigate to previous page or first page
+    const newIndex = Math.max(0, currentPageIndex - 1)
+    setCurrentPageIndex(newIndex)
+    setEditorContent(remainingPages[newIndex]?.content || '')
+    setHasUnsavedChanges(false)
+
+    // Update last_page in book
+    await supabase
+      .from('books')
+      .update({ last_page: remainingPages[newIndex]?.page_number || 1 })
+      .eq('id', bookId)
   }
 
   // Open settings modal
@@ -591,6 +763,19 @@ const BookEditorPage = () => {
                   </button>
                   <span className="font-serif" style={{ color: '#8B7355' }}>of {pages.length}</span>
 
+                  {/* Delete page button */}
+                  <button
+                    onClick={handleDeletePage}
+                    disabled={pages.length <= 1}
+                    className="ml-2 p-1 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed hover:bg-red-50"
+                    style={{ color: '#E37434' }}
+                    title={pages.length <= 1 ? 'Cannot delete the only page' : 'Delete this page'}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+
                   {/* Page selector dropdown */}
                   {showPageSelector && (
                     <>
@@ -627,14 +812,25 @@ const BookEditorPage = () => {
                     </>
                   )}
                 </div>
-                <span className="text-[10px] font-serif" style={{ color: '#8B7355' }}>
-                  Auto-saves when you pause
+                <span className="text-[10px] font-serif flex items-center gap-2" style={{ color: '#8B7355' }}>
+                  {isAutoCreatingPage ? (
+                    <>
+                      <span className="inline-block h-2 w-2 rounded-full animate-pulse" style={{ backgroundColor: '#4B9DA9' }} />
+                      <span style={{ color: '#4B9DA9' }}>Creating new page...</span>
+                    </>
+                  ) : (
+                    'Auto-saves when you pause'
+                  )}
                 </span>
               </div>
 
-              {/* Rich text editor */}
-              <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden quill-vintage">
+              {/* Rich text editor - A4 proportioned */}
+              <div 
+                className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden quill-vintage quill-a4"
+                style={{ maxHeight: `${A4_CONTENT_HEIGHT}px` }}
+              >
                 <ReactQuill
+                  ref={quillEditorRef}
                   theme="snow"
                   value={editorContent}
                   onChange={handleEditorChange}
@@ -687,8 +883,8 @@ const BookEditorPage = () => {
             )}
           </div>
 
-          {/* Right navigation arrow OR Add page button */}
-          {nextPage ? (
+          {/* Right navigation arrow - only show if there's a next page */}
+          {nextPage && (
             <button
               onClick={() => goToPage(currentPageIndex + 1)}
               className="hidden md:flex shrink-0 w-12 h-12 items-center justify-center rounded-full border-2 transition-colors"
@@ -696,17 +892,6 @@ const BookEditorPage = () => {
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          ) : (
-            <button
-              onClick={handleAddPage}
-              className="hidden md:flex shrink-0 w-12 h-12 items-center justify-center rounded-full border-2 border-dashed transition-colors hover:opacity-80"
-              style={{ borderColor: '#4B9DA9', backgroundColor: '#4B9DA910', color: '#4B9DA9' }}
-              title="Add new page"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
             </button>
           )}
@@ -728,26 +913,29 @@ const BookEditorPage = () => {
             </svg>
             Prev
           </button>
-          <button
-            onClick={handleAddPage}
-            className="shrink-0 w-10 h-10 flex items-center justify-center rounded-full border-2 border-dashed"
-            style={{ borderColor: '#4B9DA9', backgroundColor: '#4B9DA910', color: '#4B9DA9' }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-          </button>
-          <button
-            onClick={() => goToPage(currentPageIndex + 1)}
-            disabled={!nextPage}
-            className="flex-1 flex items-center justify-center gap-1 rounded-lg border-2 py-2 text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ borderColor: '#91C6BC', color: '#5C4033' }}
-          >
-            Next
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
+          {!nextPage ? (
+            <button
+              onClick={handleAddPage}
+              className="flex-1 flex items-center justify-center gap-1 rounded-lg border-2 border-dashed py-2 text-xs font-medium"
+              style={{ borderColor: '#4B9DA9', backgroundColor: '#4B9DA910', color: '#4B9DA9' }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Page
+            </button>
+          ) : (
+            <button
+              onClick={() => goToPage(currentPageIndex + 1)}
+              className="flex-1 flex items-center justify-center gap-1 rounded-lg border-2 py-2 text-xs font-medium"
+              style={{ borderColor: '#91C6BC', color: '#5C4033' }}
+            >
+              Next
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          )}
         </div>
       </main>
 
@@ -983,6 +1171,36 @@ const BookEditorPage = () => {
         }
         .quill-vintage .ql-snow .ql-picker-item:hover {
           color: #4B9DA9;
+        }
+        
+        /* A4 proportioned editor */
+        .quill-a4 {
+          max-width: 700px;
+          margin: 0 auto;
+          width: 100%;
+        }
+        .quill-a4 .ql-editor {
+          min-height: 100%;
+          background: 
+            linear-gradient(#E8E4A8 1px, transparent 1px);
+          background-size: 100% 2rem;
+          background-position: 0 1.5rem;
+        }
+        
+        /* Page fill indicator */
+        .quill-a4::after {
+          content: '';
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 3px;
+          background: linear-gradient(90deg, #91C6BC 0%, #4B9DA9 100%);
+          opacity: 0;
+          transition: opacity 0.3s;
+        }
+        .quill-a4.page-nearly-full::after {
+          opacity: 1;
         }
       `}</style>
     </div>
