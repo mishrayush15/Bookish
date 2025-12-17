@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 
 const DashboardPage = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
-  const [signingOut, setSigningOut] = useState(false)
   const [creatingBook, setCreatingBook] = useState(false)
   const [books, setBooks] = useState([])
   const [loadingBooks, setLoadingBooks] = useState(true)
@@ -52,16 +52,6 @@ const DashboardPage = () => {
     fetchBooks()
   }, [user])
 
-  // Get user info from Google metadata
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
-  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'
-
-  const handleSignOut = async () => {
-    setSigningOut(true)
-    await supabase.auth.signOut()
-    window.location.href = '/'
-  }
-
   const openNewBookModal = () => {
     setNewBookTitle('')
     setShowNewBookModal(true)
@@ -104,54 +94,8 @@ const DashboardPage = () => {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#F6F3C2' }}>
-      {/* Header */}
-      <header className="border-b-2" style={{ borderColor: '#91C6BC' }}>
-        <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="text-lg font-serif font-bold tracking-tight" style={{ color: '#3D2B1F' }}>
-              bookish<span style={{ color: '#E37434' }}>.ink</span>
-            </Link>
-            <span 
-              className="rounded-full border px-2.5 py-1 text-[11px] font-medium"
-              style={{ borderColor: '#91C6BC', color: '#5C4033', backgroundColor: '#91C6BC20' }}
-            >
-              My library
-            </span>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* User profile */}
-            <div className="flex items-center gap-2">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  className="h-8 w-8 rounded-full border-2 object-cover"
-                  style={{ borderColor: '#91C6BC' }}
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div 
-                  className="h-8 w-8 rounded-full border-2 flex items-center justify-center text-sm font-serif"
-                  style={{ borderColor: '#91C6BC', backgroundColor: '#E8E4A8', color: '#3D2B1F' }}
-                >
-                  {fullName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="hidden sm:block text-sm font-serif max-w-[120px] truncate" style={{ color: '#5C4033' }}>
-                {fullName}
-              </span>
-            </div>
-            <button
-              onClick={handleSignOut}
-              disabled={signingOut}
-              className="rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all hover:opacity-80 disabled:opacity-70 disabled:cursor-not-allowed"
-              style={{ borderColor: '#91C6BC', color: '#5C4033' }}
-            >
-              {signingOut ? 'Signing out…' : 'Sign out'}
-            </button>
-          </div>
-        </div>
-      </header>
+      {/* Navbar */}
+      <Navbar variant="dashboard" />
 
       {/* Main content */}
       <main className="mx-auto max-w-6xl px-4 py-6">

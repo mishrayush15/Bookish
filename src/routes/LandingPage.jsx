@@ -1,13 +1,10 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 
 const LandingPage = () => {
-  const { user, loading } = useAuth()
-
-  // Get user info from Google metadata
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
-  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'
+  const { user } = useAuth()
 
   return (
     <div 
@@ -15,65 +12,7 @@ const LandingPage = () => {
       style={{ backgroundColor: '#F6F3C2' }}
     >
       {/* Navbar */}
-      <header className="w-full px-6 md:px-12 py-4 flex items-center justify-between border-b-2" style={{ borderColor: '#91C6BC' }}>
-        <span className="text-xl md:text-2xl font-bold tracking-tight" style={{ color: '#3D2B1F', fontFamily: 'Georgia, serif' }}>
-          bookish<span style={{ color: '#E37434' }}>.ink</span>
-        </span>
-        
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
-          <span className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity" style={{ color: '#3D2B1F' }}>Home</span>
-          <span className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity" style={{ color: '#5C4033' }}>Features</span>
-          <span className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity" style={{ color: '#5C4033' }}>About</span>
-          <span className="text-sm font-medium cursor-pointer hover:opacity-70 transition-opacity" style={{ color: '#5C4033' }}>Contact</span>
-        </nav>
-
-        {/* Right side - Auth */}
-        <div className="flex items-center gap-3">
-          {loading ? (
-            <div className="h-9 w-20 rounded-full animate-pulse" style={{ backgroundColor: '#E8E4A8' }} />
-          ) : user ? (
-            <div className="flex items-center gap-3">
-              <div className="hidden sm:flex items-center gap-2">
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt={fullName}
-                    className="h-8 w-8 rounded-full border-2 object-cover"
-                    style={{ borderColor: '#91C6BC' }}
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <div 
-                    className="h-8 w-8 rounded-full border-2 flex items-center justify-center text-sm"
-                    style={{ borderColor: '#91C6BC', backgroundColor: '#FFFEF5', color: '#3D2B1F', fontFamily: 'Georgia, serif' }}
-                  >
-                    {fullName.charAt(0).toUpperCase()}
-                  </div>
-                )}
-                <span className="text-sm max-w-[80px] truncate" style={{ color: '#5C4033', fontFamily: 'Georgia, serif' }}>
-                  {fullName.split(' ')[0]}
-                </span>
-              </div>
-              <Link
-                to="/dashboard"
-                className="rounded-full px-5 py-2 text-sm font-medium transition-all hover:scale-105"
-                style={{ backgroundColor: '#4B9DA9', color: '#F6F3C2' }}
-              >
-                My Books
-              </Link>
-            </div>
-          ) : (
-            <Link
-              to="/login"
-              className="rounded-full px-5 py-2 text-sm font-medium transition-all hover:scale-105"
-              style={{ backgroundColor: '#4B9DA9', color: '#F6F3C2' }}
-            >
-              Sign In
-            </Link>
-          )}
-        </div>
-      </header>
+      <Navbar variant="landing" />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col md:flex-row px-6 md:px-12 py-4 md:py-0 overflow-hidden">

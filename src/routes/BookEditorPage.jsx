@@ -4,6 +4,7 @@ import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
+import Navbar from '../components/Navbar'
 
 // Quill editor configuration
 const quillModules = {
@@ -80,9 +81,6 @@ const BookEditorPage = () => {
     hasUnsavedChangesRef.current = hasUnsavedChanges
   }, [hasUnsavedChanges])
 
-  // Get user info from Google metadata
-  const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture
-  const fullName = user?.user_metadata?.full_name || user?.user_metadata?.name || 'User'
 
   // Fetch book and pages
   useEffect(() => {
@@ -213,7 +211,7 @@ const BookEditorPage = () => {
     // Set new timeout
     autoSaveRef.current = setTimeout(() => {
       performAutoSave()
-    }, 1500) // 1.5 seconds after user stops typing
+    }, 600) // 1.5 seconds after user stops typing
   }, [performAutoSave])
 
   // Cleanup timeout on unmount
@@ -393,75 +391,15 @@ const BookEditorPage = () => {
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ backgroundColor: '#F6F3C2' }}>
-      {/* Header */}
-      <header className="border-b-2" style={{ borderColor: '#91C6BC', backgroundColor: '#FFFEF5' }}>
-        <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link
-              to="/dashboard"
-              className="transition-colors hover:opacity-70"
-              title="Back to Dashboard"
-              style={{ color: '#5C4033' }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </Link>
-            <div className="flex flex-col">
-              <span className="text-[10px] uppercase tracking-[0.2em] font-sans" style={{ color: '#8B7355' }}>Writing</span>
-              <button
-                onClick={openSettings}
-                className="text-sm font-serif font-medium transition-colors text-left flex items-center gap-1.5 hover:opacity-70"
-                style={{ color: '#3D2B1F' }}
-              >
-                {book?.title || 'Untitled'}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" style={{ color: '#8B7355' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-          <div className="flex items-center gap-3 text-[11px]">
-            {/* Save status */}
-            <span
-              className="inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1"
-              style={{ 
-                borderColor: hasUnsavedChanges ? '#E37434' : '#91C6BC',
-                color: hasUnsavedChanges ? '#E37434' : '#4B9DA9'
-              }}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${hasUnsavedChanges ? 'animate-pulse' : ''}`}
-                style={{ backgroundColor: hasUnsavedChanges ? '#E37434' : '#91C6BC' }}
-              />
-              <span className="font-medium">{hasUnsavedChanges ? 'Unsaved' : 'Saved'}</span>
-            </span>
-
-            {/* User profile */}
-            <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              {avatarUrl ? (
-                <img
-                  src={avatarUrl}
-                  alt={fullName}
-                  className="h-7 w-7 rounded-full border-2 object-cover"
-                  style={{ borderColor: '#91C6BC' }}
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div 
-                  className="h-7 w-7 rounded-full border-2 flex items-center justify-center text-xs font-serif"
-                  style={{ borderColor: '#91C6BC', backgroundColor: '#E8E4A8', color: '#3D2B1F' }}
-                >
-                  {fullName.charAt(0).toUpperCase()}
-                </div>
-              )}
-              <span className="hidden sm:block text-xs font-serif max-w-[100px] truncate" style={{ color: '#5C4033' }}>
-                {fullName}
-              </span>
-            </Link>
-          </div>
-        </div>
-      </header>
+      {/* Navbar */}
+      <Navbar 
+        variant="editor" 
+        editorData={{
+          bookTitle: book?.title,
+          onTitleClick: openSettings,
+          hasUnsavedChanges
+        }}
+      />
 
       {/* Main content - Book layout */}
       <main className="flex-1 w-full px-2 md:px-4 py-4 flex items-center justify-center overflow-hidden">
