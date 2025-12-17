@@ -1,0 +1,43 @@
+@import "tailwindcss";
+
+:root {
+  /* Vintage Book Color Palette */
+  --color-cream: #F6F3C2;
+  --color-cream-dark: #E8E4A8;
+  --color-teal: #4B9DA9;
+  --color-teal-light: #91C6BC;
+  --color-teal-dark: #3A7A84;
+  --color-orange: #E37434;
+  --color-orange-light: #F5945A;
+  --color-brown: #5C4033;
+  --color-brown-light: #8B7355;
+  --color-brown-dark: #3D2B1F;
+}
+
+/* Custom scrollbar for vintage look */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-cream-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-teal-light);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-teal);
+}
+
+/* Selection color */
+::selection {
+  background: var(--color-teal-light);
+  color: var(--color-brown-dark);
+}
+
+body {
+  font-family: 'Georgia', 'Times New Roman', serif;
+}
