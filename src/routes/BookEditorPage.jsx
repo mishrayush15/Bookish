@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import ReactQuill from 'react-quill-new'
 import 'react-quill-new/dist/quill.snow.css'
+import html2pdf from 'html2pdf.js'
 import { supabase } from '../lib/supabaseClient'
 import { useAuth } from '../context/AuthContext'
 import Navbar from '../components/Navbar'
@@ -61,6 +62,9 @@ const BookEditorPage = () => {
 
   // Page selector dropdown
   const [showPageSelector, setShowPageSelector] = useState(false)
+
+  // PDF download state
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false)
 
   // Auto-save refs
   const autoSaveRef = useRef(null)
@@ -359,6 +363,124 @@ const BookEditorPage = () => {
     navigate('/dashboard')
   }
 
+  // Download book as PDF
+  const handleDownloadPdf = async () => {
+    if (isDownloadingPdf || !book || pages.length === 0) return
+    
+    if (hasUnsavedChanges) {
+      alert('Please save your current page before downloading the PDF.')
+      return
+    }
+
+    setIsDownloadingPdf(true)
+
+    try {
+      // Create a simple container - NO fancy positioning
+      const element = document.createElement('div')
+      element.id = 'pdf-content-simple'
+      
+      // Simple inline styles - width in px for consistency
+      element.style.width = '700px'
+      element.style.padding = '50px'
+      element.style.backgroundColor = '#FFFEF5'
+      element.style.fontFamily = 'Georgia, Times New Roman, serif'
+      element.style.color = '#3D2B1F'
+      element.style.boxSizing = 'border-box'
+
+      // Build simple HTML for each page
+      let htmlContent = ''
+
+      // Title page - centered text but starts from top with padding
+      htmlContent += `
+        <div style="text-align: center; padding-top: 150px; page-break-after: always;">
+          <h1 style="font-size: 32px; margin: 0 0 20px 0; color: #3D2B1F; word-wrap: break-word;">${book.title || 'Untitled'}</h1>
+          <p style="font-size: 14px; color: #8B7355; font-style: italic; margin: 0;">Created with bookish.ink</p>
+        </div>
+      `
+
+      // Content pages - text starts from TOP
+      pages.forEach((page) => {
+        let content = page.content || ''
+        if (page.id === currentPage?.id) {
+          content = editorContent || ''
+        }
+        
+        if (!content.trim() || content === '<p><br></p>') {
+          content = '<p style="color: #8B7355; font-style: italic;">This page is empty.</p>'
+        }
+
+        // Strip any Quill-specific classes and ensure word wrap
+        const cleanContent = content
+          .replace(/class="[^"]*"/g, '')
+          .replace(/<p>/g, '<p style="margin: 0 0 16px 0; word-wrap: break-word; overflow-wrap: break-word;">')
+
+        htmlContent += `
+          <div style="page-break-after: always;">
+            <div style="font-size: 16px; line-height: 1.8; word-wrap: break-word; overflow-wrap: break-word; text-align: left;">
+              ${cleanContent}
+            </div>
+            <div style="text-align: center; margin-top: 30px; padding-top: 15px; border-top: 1px solid #E8E4A8; color: #8B7355; font-size: 12px;">
+              — Page ${page.page_number} —
+            </div>
+          </div>
+        `
+      })
+
+      element.innerHTML = htmlContent
+
+      // Apply word-wrap to ALL text elements
+      document.body.appendChild(element)
+      
+      const allParagraphs = element.querySelectorAll('p')
+      allParagraphs.forEach(p => {
+        p.style.wordWrap = 'break-word'
+        p.style.overflowWrap = 'break-word'
+        p.style.whiteSpace = 'pre-wrap'
+        p.style.maxWidth = '600px'
+      })
+
+      const allHeadings = element.querySelectorAll('h1, h2, h3, h4, h5, h6')
+      allHeadings.forEach(h => {
+        h.style.wordWrap = 'break-word'
+        h.style.overflowWrap = 'break-word'
+      })
+
+      // Small delay to ensure DOM is ready
+      await new Promise(r => setTimeout(r, 200))
+
+      // Simple PDF options
+      const opt = {
+        margin: [10, 10, 10, 10],
+        filename: `${(book.title || 'Untitled').replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { 
+          scale: 2,
+          useCORS: true,
+          logging: true, // Enable logging to see errors
+          backgroundColor: '#FFFEF5'
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait' 
+        },
+        pagebreak: { mode: 'avoid-all', before: '.page-break' }
+      }
+
+      await html2pdf().set(opt).from(element).save()
+      
+      document.body.removeChild(element)
+
+    } catch (err) {
+      console.error('PDF Error:', err)
+      alert('PDF generation failed. Check console for details.')
+      const el = document.getElementById('pdf-content-simple')
+      if (el) document.body.removeChild(el)
+    } finally {
+      setIsDownloadingPdf(false)
+    }
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -397,7 +519,9 @@ const BookEditorPage = () => {
         editorData={{
           bookTitle: book?.title,
           onTitleClick: openSettings,
-          hasUnsavedChanges
+          hasUnsavedChanges,
+          onDownloadPdf: handleDownloadPdf,
+          isDownloading: isDownloadingPdf
         }}
       />
 

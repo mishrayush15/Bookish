@@ -160,7 +160,7 @@ const Navbar = ({
 
   // Editor Navbar
   if (variant === 'editor') {
-    const { bookTitle, onTitleClick, hasUnsavedChanges } = editorData || {}
+    const { bookTitle, onTitleClick, hasUnsavedChanges, onDownloadPdf, isDownloading } = editorData || {}
     
     return (
       <header className="border-b-2" style={{ borderColor: '#91C6BC', backgroundColor: '#FFFEF5' }}>
@@ -193,6 +193,32 @@ const Navbar = ({
             </div>
           </div>
           <div className="flex items-center gap-3 text-[11px]">
+            {/* Download PDF button */}
+            <button
+              onClick={onDownloadPdf}
+              disabled={isDownloading}
+              className="inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1 transition-all hover:opacity-80 disabled:opacity-60 disabled:cursor-not-allowed"
+              style={{ borderColor: '#4B9DA9', color: '#4B9DA9' }}
+              title="Download as PDF"
+            >
+              {isDownloading ? (
+                <>
+                  <div 
+                    className="h-3 w-3 rounded-full border-2 border-t-transparent animate-spin"
+                    style={{ borderColor: '#4B9DA9' }}
+                  />
+                  <span className="font-medium hidden sm:inline">Generating...</span>
+                </>
+              ) : (
+                <>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="font-medium hidden sm:inline">Download PDF</span>
+                </>
+              )}
+            </button>
+
             {/* Save status */}
             <span
               className="inline-flex items-center gap-1.5 rounded-full border-2 px-2.5 py-1"

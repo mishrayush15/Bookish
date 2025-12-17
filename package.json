@@ -12,6 +12,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.87.3",
     "@tailwindcss/vite": "^4.1.18",
+    "html2pdf.js": "^0.12.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-quill-new": "^3.6.0",
